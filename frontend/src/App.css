@@ -1,0 +1,64 @@
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 64px 24px;
+}
+
+.hero h1 {
+  margin: 8px 0 12px;
+  font-size: 2.6rem;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #d01012;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lead {
+  max-width: 62ch;
+  color: #44506f;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 32px;
+}
+
+article {
+  background: #fff;
+  border: 1px solid #dce3f0;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+article h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.status {
+  margin: 0;
+  font-weight: 600;
+}
+
+.status.ok {
+  color: #0f7b3a;
+}
+
+.status.error {
+  color: #d01012;
+}
+
+.status.pending {
+  color: #5b6b8c;
+}
