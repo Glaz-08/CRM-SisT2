@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { databaseConfig } from './config/database.config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { HealthModule } from './health/health.module';
@@ -18,16 +19,7 @@ import { IntegracionModule } from './modules/integracion/integracion.module';
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get<string>('DATABASE_HOST', 'localhost'),
-        port: Number(config.get('DATABASE_PORT', 5432)),
-        username: config.get<string>('DATABASE_USER', 'crm'),
-        password: config.get<string>('DATABASE_PASSWORD', 'crm'),
-        database: config.get<string>('DATABASE_NAME', 'crm_lego'),
-        autoLoadEntities: true,
-        synchronize: config.get<string>('DATABASE_SYNC', 'false') === 'true',
-      }),
+      useFactory: databaseConfig,
     }),
     HealthModule,
     ClientesModule,

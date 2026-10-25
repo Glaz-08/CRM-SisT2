@@ -1,6 +1,6 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
-@Entity({ schema: 'crm', name: 'historial_cliente' })
+@Entity({ name: 'historial_cliente' })
 export class Historial {
   @PrimaryGeneratedColumn('identity', { name: 'id_historial' })
   idHistorial: number;

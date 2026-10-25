@@ -17,25 +17,35 @@ backend/                  NestJS (monolito modular)
     seguimientos/         SEGUIMIENTO_CRM
     historial/            HISTORIAL_CLIENTE (vista 360°)
     integracion/          Ingesta de payloads / eventos
-docker-compose.yml        API + web + PostgreSQL
+database/init/            DDL del esquema crm (para Postgres local)
+docker-compose.yml        API + web (+ PostgreSQL local opcional)
 ```
+
+## Configuración
+
+La API se conecta a la base PostgreSQL del profesor (Neon), esquema `crm`, con SSL y `synchronize` desactivado.
+
+```bash
+cp backend/.env.example backend/.env   # completar con las credenciales reales
+```
+
+Las credenciales viven solo en `backend/.env` (ignorado por git). Nunca van en el frontend ni en variables `VITE_`.
 
 ## Levantar con Docker
 
 ```bash
-cp .env.example .env
 docker compose up --build
 ```
 
 - Frontend: http://localhost:8080
 - API: http://localhost:3000/api/health
-- PostgreSQL: localhost:5432
+
+El servicio `api` lee `backend/.env`. Para usar un Postgres local en vez de Neon: `docker compose --profile local-db up` y apuntar `DB_HOST`, `DB_SSL=false`, etc. a ese contenedor.
 
 ## Desarrollo local
 
-1. `docker compose up postgres`
-2. En `backend/`: copiar variables de `.env.example` y `npm run start:dev`
-3. En `frontend/`: `npm run dev` → http://localhost:5173
+1. En `backend/`: `npm run start:dev`
+2. En `frontend/`: `npm run dev` → http://localhost:5173
 
 ## Contratos iniciales
 

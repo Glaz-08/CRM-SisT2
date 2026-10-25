@@ -16,7 +16,7 @@ export const ESTADOS_SEGUIMIENTO = [
 
 export type EstadoSeguimiento = (typeof ESTADOS_SEGUIMIENTO)[number];
 
-@Entity({ schema: 'crm', name: 'seguimiento_crm' })
+@Entity({ name: 'seguimiento_crm' })
 export class Seguimiento {
   @PrimaryGeneratedColumn('identity', { name: 'id_seguimiento_crm' })
   idSeguimientoCrm: number;
