@@ -1,30 +1,19 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  JoinColumn,
-  ManyToOne,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
-import { Cliente } from '../../clientes/entities/cliente.entity';
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
-@Entity({ name: 'historial_cliente' })
+@Entity({ schema: 'crm', name: 'historial_cliente' })
 export class Historial {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn('identity', { name: 'id_historial' })
+  idHistorial: number;
 
-  @ManyToOne(() => Cliente, (cliente) => cliente.historial, {
-    onDelete: 'CASCADE',
-  })
-  @JoinColumn({ name: 'cliente_id' })
-  cliente: Cliente;
+  @Column({ name: 'id_cliente', type: 'integer' })
+  idCliente: number;
 
-  @Column()
-  evento: string;
+  @Column({ type: 'date', default: () => 'CURRENT_DATE' })
+  fecha: string;
 
-  @Column({ type: 'jsonb', nullable: true })
-  detalle: Record<string, unknown> | null;
+  @Column({ name: 'tipo_evento', type: 'text' })
+  tipoEvento: string;
 
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
+  @Column({ type: 'text' })
+  descripcion: string;
 }

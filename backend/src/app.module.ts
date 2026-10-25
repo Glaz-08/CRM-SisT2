@@ -26,7 +26,7 @@ import { IntegracionModule } from './modules/integracion/integracion.module';
         password: config.get<string>('DATABASE_PASSWORD', 'crm'),
         database: config.get<string>('DATABASE_NAME', 'crm_lego'),
         autoLoadEntities: true,
-        synchronize: config.get<string>('DATABASE_SYNC', 'true') === 'true',
+        synchronize: config.get<string>('DATABASE_SYNC', 'false') === 'true',
       }),
     }),
     HealthModule,

@@ -12,7 +12,8 @@ export class InteraccionesService {
 
   findAll(): Promise<Interaccion[]> {
     return this.interaccionesRepository.find({
-      relations: ['cliente'],
+      relations: ['seguimientos'],
+      order: { fecha: 'DESC' },
     });
   }
 }

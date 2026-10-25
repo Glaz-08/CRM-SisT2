@@ -12,7 +12,7 @@ export class HistorialService {
 
   findAll(): Promise<Historial[]> {
     return this.historialRepository.find({
-      relations: ['cliente'],
+      order: { fecha: 'DESC' },
     });
   }
 }

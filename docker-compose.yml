@@ -11,6 +11,7 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crm} -d ${POSTGRES_DB:-crm_lego}"]
       interval: 5s
@@ -33,7 +34,7 @@ services:
       DATABASE_USER: ${POSTGRES_USER:-crm}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-crm}
       DATABASE_NAME: ${POSTGRES_DB:-crm_lego}
-      DATABASE_SYNC: "true"
+      DATABASE_SYNC: "false"
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
     ports:
       - "3000:3000"

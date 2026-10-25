@@ -1,45 +1,39 @@
 import {
   Column,
-  CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
-  UpdateDateColumn,
 } from 'typeorm';
-import { Cliente } from '../../clientes/entities/cliente.entity';
 import { Interaccion } from '../../interacciones/entities/interaccion.entity';
 
-@Entity({ name: 'seguimiento_crm' })
+export const ESTADOS_SEGUIMIENTO = [
+  'pendiente',
+  'en_proceso',
+  'completado',
+  'cancelado',
+] as const;
+
+export type EstadoSeguimiento = (typeof ESTADOS_SEGUIMIENTO)[number];
+
+@Entity({ schema: 'crm', name: 'seguimiento_crm' })
 export class Seguimiento {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn('identity', { name: 'id_seguimiento_crm' })
+  idSeguimientoCrm: number;
 
-  @ManyToOne(() => Cliente, (cliente) => cliente.seguimientos, {
-    onDelete: 'CASCADE',
-  })
-  @JoinColumn({ name: 'cliente_id' })
-  cliente: Cliente;
+  @Column({ name: 'id_interaccion', type: 'integer' })
+  idInteraccion: number;
 
-  @ManyToOne(() => Interaccion, (interaccion) => interaccion.seguimientos, {
-    nullable: true,
-    onDelete: 'SET NULL',
-  })
-  @JoinColumn({ name: 'interaccion_id' })
-  interaccion: Interaccion | null;
+  @ManyToOne(() => Interaccion, (interaccion) => interaccion.seguimientos)
+  @JoinColumn({ name: 'id_interaccion' })
+  interaccion: Interaccion;
 
-  @Column()
-  responsable: string;
+  @Column({ name: 'fecha_programada', type: 'date' })
+  fechaProgramada: string;
 
-  @Column({ default: 'pendiente' })
-  estado: string;
+  @Column({ name: 'accion_requerida', type: 'text' })
+  accionRequerida: string;
 
-  @Column({ name: 'programado_para', type: 'timestamptz', nullable: true })
-  programadoPara: Date | null;
-
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
-
-  @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
+  @Column({ type: 'text', default: 'pendiente' })
+  estado: EstadoSeguimiento;
 }

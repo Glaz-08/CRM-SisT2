@@ -12,7 +12,8 @@ export class SeguimientosService {
 
   findAll(): Promise<Seguimiento[]> {
     return this.seguimientosRepository.find({
-      relations: ['cliente', 'interaccion'],
+      relations: ['interaccion'],
+      order: { fechaProgramada: 'ASC' },
     });
   }
 }

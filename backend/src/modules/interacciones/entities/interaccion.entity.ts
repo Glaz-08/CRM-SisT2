@@ -1,38 +1,26 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  JoinColumn,
-  ManyToOne,
-  OneToMany,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
-import { Cliente } from '../../clientes/entities/cliente.entity';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Seguimiento } from '../../seguimientos/entities/seguimiento.entity';
 
-@Entity({ name: 'interaccion_crm' })
+@Entity({ schema: 'crm', name: 'interaccion_crm' })
 export class Interaccion {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn('identity', { name: 'id_interaccion' })
+  idInteraccion: number;
 
-  @ManyToOne(() => Cliente, (cliente) => cliente.interacciones, {
-    onDelete: 'CASCADE',
-  })
-  @JoinColumn({ name: 'cliente_id' })
-  cliente: Cliente;
+  @Column({ name: 'id_cliente', type: 'integer' })
+  idCliente: number;
 
-  @Column()
+  @Column({ name: 'id_empleado', type: 'integer' })
+  idEmpleado: number;
+
+  @Column({ type: 'date', default: () => 'CURRENT_DATE' })
+  fecha: string;
+
+  @Column({ type: 'text' })
   canal: string;
 
-  @Column()
-  motivo: string;
-
-  @Column({ type: 'jsonb', nullable: true })
-  payload: Record<string, unknown> | null;
+  @Column({ type: 'text' })
+  detalle: string;
 
   @OneToMany(() => Seguimiento, (seguimiento) => seguimiento.interaccion)
   seguimientos: Seguimiento[];
-
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
 }
