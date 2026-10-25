@@ -1,23 +1,47 @@
-:root {
-  font-family: Inter, Segoe UI, system-ui, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color: #14213d;
-  background: #f4f6fb;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
+@import 'tailwindcss';
+@import '@fontsource-variable/fredoka';
+@import '@fontsource-variable/nunito';
+
+/*
+ * Tokens de diseño del módulo CRM (estilo LesGo).
+ * Cada --color-* genera utilidades de Tailwind: bg-brick, text-stud, border-panel, etc.
+ * Las combinaciones de clases reutilizables viven en src/styles/ui.ts.
+ */
+@theme {
+  --color-brick: #e8312f;
+  --color-brick-dark: #a8161b;
+  --color-stud: #ffc629;
+  --color-ink: #1d2433;
+  --color-muted: #5b6577;
+  --color-panel: #e9edf2;
+  --color-panel-strong: #c9d2dc;
+  --color-search: #a3a6ab;
+
+  --color-lego-red: #d9262c;
+  --color-lego-blue: #1f5fae;
+  --color-lego-yellow: #f5b70f;
+  --color-lego-green: #2b8a45;
+  --color-lego-orange: #f07a1d;
+
+  --font-display: 'Fredoka Variable', 'Fredoka', ui-rounded, system-ui, sans-serif;
+  --font-body: 'Nunito Variable', 'Nunito', system-ui, sans-serif;
 }
 
-* {
-  box-sizing: border-box;
+@layer base {
+  html {
+    @apply bg-white font-body text-ink antialiased;
+  }
+
+  code {
+    @apply font-mono text-[0.9em];
+  }
 }
 
-body {
-  margin: 0;
-}
-
-code {
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 0.92em;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
