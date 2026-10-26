@@ -1,8 +1,10 @@
+import { NavLink } from 'react-router-dom'
 import type { Counts } from '../hooks/useCrmApi'
-import { crmHref, crmModules } from '../data/modules'
+import { crmModules } from '../data/modules'
 import { dotColor, panel, sidebar } from '../styles/ui'
 import { cx } from '../styles/cx'
 
+/** Accesos rápidos con el conteo de registros calculado por `useCrmApi`. */
 export function Sidebar({ counts }: { counts: Counts }) {
   return (
     <aside className={cx(panel.base, sidebar.root)}>
@@ -12,11 +14,14 @@ export function Sidebar({ counts }: { counts: Counts }) {
             const count = counts[module.id]
             return (
               <li key={module.id}>
-                <a href={crmHref(module.id)} className={sidebar.item}>
+                <NavLink
+                  to={module.path}
+                  className={({ isActive }) => cx(sidebar.item, isActive && 'bg-white/80')}
+                >
                   <span aria-hidden="true" className={cx(sidebar.dot, dotColor[module.color])} />
                   <span className={sidebar.label}>{module.name}</span>
                   {typeof count === 'number' && <span className={sidebar.count}>{count}</span>}
-                </a>
+                </NavLink>
               </li>
             )
           })}
