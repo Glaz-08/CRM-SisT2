@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
+import { apiBaseUrl, apiClient, toApiError } from '../api/client'
 import { crmModules } from '../data/modules'
 
-export const apiUrl = import.meta.env.VITE_API_URL ?? '/api'
+export const apiUrl = apiBaseUrl
 
 /** Cantidad de registros por módulo: número, null (cargando) o 'error'. */
 export type Counts = Record<string, number | null | 'error'>
@@ -12,14 +13,6 @@ export type HealthResult =
 
 const HEALTH_TIMEOUT_MS = 5000
 
-async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${apiUrl}${path}`)
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`)
-  }
-  return response.json() as Promise<T>
-}
-
 /**
  * Consulta GET /api/health y traduce la respuesta a un resultado simple.
  * Nunca lanza errores: siempre devuelve 'ok' o 'error' con el motivo.
@@ -27,23 +20,20 @@ async function getJson<T>(path: string): Promise<T> {
 export async function checkHealth(): Promise<HealthResult> {
   const start = performance.now()
   try {
-    const response = await fetch(`${apiUrl}/health`, {
-      cache: 'no-store',
-      signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
-    })
-    if (!response.ok) {
-      return { status: 'error', reason: 'http', detail: `HTTP ${response.status}` }
-    }
-    const data = (await response.json()) as { status?: string }
+    const data = await apiClient.get<{ status?: string }>('/health', HEALTH_TIMEOUT_MS)
     if (data.status !== 'ok') {
       return { status: 'error', reason: 'http', detail: `status: ${String(data.status)}` }
     }
     return { status: 'ok', ms: Math.round(performance.now() - start) }
-  } catch (reason) {
-    if (reason instanceof DOMException && reason.name === 'TimeoutError') {
+  } catch (error) {
+    const apiError = toApiError(error)
+    if (apiError.status === 0 && apiError.message.toLowerCase().includes('tardó')) {
       return { status: 'error', reason: 'timeout', detail: `Sin respuesta en ${HEALTH_TIMEOUT_MS / 1000} s` }
     }
-    return { status: 'error', reason: 'network', detail: reason instanceof Error ? reason.message : 'Error de red' }
+    if (apiError.status > 0) {
+      return { status: 'error', reason: 'http', detail: `HTTP ${apiError.status}` }
+    }
+    return { status: 'error', reason: 'network', detail: apiError.message }
   }
 }
 
@@ -53,16 +43,17 @@ export async function checkHealth(): Promise<HealthResult> {
  */
 export function useCrmApi() {
   const [counts, setCounts] = useState<Counts>(() =>
-    Object.fromEntries(crmModules.filter((m) => m.countable).map((m) => [m.id, null])),
+    Object.fromEntries(crmModules.filter((module) => module.countable).map((module) => [module.id, null])),
   )
 
   useEffect(() => {
     let active = true
 
-    for (const module of crmModules.filter((m) => m.countable)) {
-      getJson<unknown[]>(module.endpoint)
-        .then((rows) => active && setCounts((prev) => ({ ...prev, [module.id]: rows.length })))
-        .catch(() => active && setCounts((prev) => ({ ...prev, [module.id]: 'error' })))
+    for (const module of crmModules.filter((item) => item.countable)) {
+      apiClient
+        .get<unknown[]>(module.endpoint)
+        .then((rows) => active && setCounts((previous) => ({ ...previous, [module.id]: rows.length })))
+        .catch(() => active && setCounts((previous) => ({ ...previous, [module.id]: 'error' })))
     }
 
     return () => {
