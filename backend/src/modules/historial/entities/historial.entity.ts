@@ -1,5 +1,6 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
+/** Evento de la vista 360°; no tiene FK porque el cliente vive en otro maestro. */
 @Entity({ name: 'historial_cliente' })
 export class Historial {
   @PrimaryGeneratedColumn('identity', { name: 'id_historial' })
