@@ -12,10 +12,11 @@ Los demás grupos envían payloads por `POST /api/events`. NestJS los publica en
 frontend/                 React + Vite
 backend/                  NestJS (monolito modular)
   src/modules/
-    clientes/             Validación RUT/ID · tabla CLIENTE
+    clientes/             Validación contra "master"."cliente" + maestro mock de empleados
     interacciones/        INTERACCION_CRM
     seguimientos/         SEGUIMIENTO_CRM
     historial/            HISTORIAL_CLIENTE (vista 360°)
+    reportes/             Resumen de seguimientos, tiempos y canales
     integracion/          Ingesta de payloads / eventos
 database/init/            DDL del esquema crm (para Postgres local)
 docker-compose.yml        API + web (+ PostgreSQL local opcional)
@@ -23,10 +24,20 @@ docker-compose.yml        API + web (+ PostgreSQL local opcional)
 
 ## Configuración
 
-La API se conecta a la base PostgreSQL del profesor (Neon), esquema `crm`, con SSL y `synchronize` desactivado.
+La API se conecta a la base PostgreSQL del profesor (Neon), esquema `crm`, con SSL y `synchronize` desactivado. El maestro real de clientes está en `"master"."cliente"` de la misma base; el maestro de empleados todavía se resuelve con datos mock porque `RRHH` no existe en esa base.
 
 ```bash
 cp backend/.env.example backend/.env   # completar con las credenciales reales
+cd backend && npm run seed:master      # 10 clientes demo idempotentes
+```
+
+Variables relevantes:
+
+```env
+DB_NAME=si2_22026
+DB_SCHEMA=crm
+CLIENTE_MAESTRO_MODE=db
+EMPLEADO_MAESTRO_MODE=mock
 ```
 
 Las credenciales viven solo en `backend/.env` (ignorado por git). Nunca van en el frontend ni en variables `VITE_`.
@@ -40,7 +51,13 @@ docker compose up --build
 - Frontend: http://localhost:8080
 - API: http://localhost:3000/api/health
 
-El servicio `api` lee `backend/.env`. Para usar un Postgres local en vez de Neon: `docker compose --profile local-db up` y apuntar `DB_HOST`, `DB_SSL=false`, etc. a ese contenedor.
+El servicio `api` lee `backend/.env`. Para usar un Postgres local en vez de Neon:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml --profile local-db up --build
+```
+
+Ese override usa `CLIENTE_MAESTRO_MODE=mock` y `EMPLEADO_MAESTRO_MODE=mock` para que el stack local no dependa de `master`/`RRHH`.
 
 ## Desarrollo local
 
@@ -52,8 +69,15 @@ El servicio `api` lee `backend/.env`. Para usar un Postgres local en vez de Neon
 | Método | Ruta | Uso |
 | --- | --- | --- |
 | GET | `/api/health` | Salud del servicio |
-| GET | `/api/clientes` | Listado de clientes |
-| GET | `/api/interacciones` | Listado de interacciones |
-| GET | `/api/seguimientos` | Listado de seguimientos |
+| GET | `/api/health/db` | Salud de la conexión PostgreSQL |
+| GET | `/api/clientes` | Clientes del maestro `master.cliente` |
+| GET | `/api/clientes/:id` | Cliente por ID |
+| GET | `/api/clientes/rut/:rut` | Cliente por RUT |
+| GET/POST | `/api/interacciones` | Listado y registro de interacciones |
+| GET/POST | `/api/seguimientos` | Listado y registro de seguimientos |
+| PATCH | `/api/seguimientos/:id/estado` | Cambio de estado |
 | GET | `/api/historial` | Historial 360° |
+| GET | `/api/reportes/resumen` | Métricas del CRM |
 | POST | `/api/events` | Recibe payloads de otros grupos |
+
+Documentación detallada: [`docs/api.md`](docs/api.md), [`docs/crm-schema.md`](docs/crm-schema.md), [`docs/events.md`](docs/events.md) y [`docs/demo.md`](docs/demo.md).
