@@ -1,448 +1,377 @@
-# Plan: CRM — CRUD, historial y conexión Neon
+# Plan: Frontend consumption of all CRM API endpoints
 
-> **Estado de implementación (2026-10-26): completado.** La configuración final usa
-> `CLIENTE_MAESTRO_MODE=db` y `EMPLEADO_MAESTRO_MODE=mock`, con clientes reales en
-> `"master"."cliente"` de `si2_22026`. Los conteos y la guía vigente están en `docs/`.
-> Las referencias históricas a `MAESTROS_MODE`/`10/10/10` describen el punto de partida.
-
-Branch: `plan/crm-crud-historial-neon`
+Branch: `plan/frontend-consume-crm-api`
 Created: 2026-10-26
 
 ## Goal
 
-Completar el módulo CRM del ERP:
+Build out the React frontend so every operation exposed by the CRM API is usable from the UI, using `frontend/docs/api.json` as the endpoint checklist.
 
-- Ajustar las entidades TypeORM a las tablas reales del esquema `crm`.
-- Implementar registro y consulta de interacciones.
-- Implementar registro y consulta de seguimientos.
-- Implementar actualización del estado de seguimiento.
-- Implementar consulta del historial por cliente.
-- Generar historial automáticamente al registrar una interacción.
-- Validar campos obligatorios, textos vacíos, fechas y estados permitidos.
-- Validar que exista la interacción al crear un seguimiento.
-- Documentar las tres tablas del esquema `crm`.
-- Configurar y verificar la conexión a Neon con SSL y variables de entorno.
-- Mantener `synchronize: false` en la base compartida.
-- Coordinar las relaciones con clientes y empleados.
-- Verificar los 10 registros por tabla.
-- Probar el flujo completo, el arranque con Docker Compose y la persistencia.
-- Preparar y ensayar la demo del sprint.
+The frontend must cover:
+
+- Health checks.
+- Client master lookups.
+- Interaction listing, filtering, detail and creation.
+- Follow-up listing, filtering, detail, creation and status updates.
+- Global and per-client history.
+- Reports summary.
+- Inbound event ingestion.
+- The complete Mock ERP console when `ENABLE_MOCKS=true`.
 
 ## Context
 
-### Esquema real verificado en Neon
+### API specification status
 
-Base: `si2_22026` (Neon, PostgreSQL 17.11). Conexión SSL con `rejectUnauthorized: true` verificada.
+`frontend/docs/api.json` contains 29 operations, but it is not usable for client generation:
 
-Solo existen estas tres tablas en `crm`:
+- `components.schemas` exist but all have empty `properties`.
+- Responses have no content schemas.
+- `servers` is empty.
+- Only paths, methods, path parameters and request-body DTO names are reliable.
 
-- `crm.interaccion_crm`
-  - `id_interaccion` integer identity PK
-  - `id_cliente` integer NOT NULL
-  - `id_empleado` integer NOT NULL
-  - `fecha` date NOT NULL DEFAULT CURRENT_DATE
-  - `canal` text NOT NULL CHECK `btrim(canal) <> ''`
-  - `detalle` text NOT NULL CHECK `btrim(detalle) <> ''`
-- `crm.seguimiento_crm`
-  - `id_seguimiento_crm` integer identity PK
-  - `id_interaccion` integer NOT NULL FK → `interaccion_crm(id_interaccion)`
-  - `fecha_programada` date NOT NULL
-  - `accion_requerida` text NOT NULL CHECK `btrim(accion_requerida) <> ''`
-  - `estado` text NOT NULL DEFAULT `'pendiente'` CHECK en (`pendiente`, `en_proceso`, `completado`, `cancelado`)
-- `crm.historial_cliente`
-  - `id_historial` integer identity PK
-  - `id_cliente` integer NOT NULL
-  - `fecha` date NOT NULL DEFAULT CURRENT_DATE
-  - `tipo_evento` text NOT NULL CHECK `btrim(tipo_evento) <> ''`
-  - `descripcion` text NOT NULL CHECK `btrim(descripcion) <> ''`
+Therefore:
 
-### Estado actual del repositorio
+- `api.json` is the coverage checklist.
+- Types are written manually from the backend DTOs/entities and `docs/api.md`.
+- No `openapi-typescript` or generated client in this iteration.
 
-- Las entidades `Interaccion`, `Seguimiento` y `Historial` ya calzan con las tablas reales. Fueron probadas contra Neon con TypeORM: columnas y relaciones funcionan.
-- La entidad `Cliente` está rota: apunta a una tabla `crm.cliente` con `uuid` que no existe.
-- Solo existen endpoints GET de listado; no hay DTOs, POST, PATCH, validaciones, historial automático ni reportes.
-- `database.config.ts` ya usa SSL y `synchronize` por defecto en `false`.
-- `backend/.env` existe y la conexión a Neon funciona.
-- El frontend es un landing con conteos; no hay formularios CRUD.
+### Decisions agreed with the user
 
-### Datos actuales verificados
+- Add `react-router-dom` and use one route per area.
+- Mock ERP is a first-class `/mock-erp` page.
+- Types are hand-written from the backend DTOs/entities, not generated from `api.json`.
+- Keep the existing Lego theme and shared styles.
+- Leave the unrelated untracked `backend/pnpm-lock.yaml` and `backend/pnpm-workspace.yaml` untouched.
 
-- `interaccion_crm`: 10 registros.
-- `seguimiento_crm`: 10 registros, todos `pendiente`.
-- `historial_cliente`: 10 registros, todos `contacto_comercial`.
-- Interacciones: clientes `1..10`, empleado `1`, canales `whatsapp`/`email`, fecha `2026-10-25`.
-- Seguimientos: programados para `2026-10-27`.
-- Historial: descripciones del tipo `[DEMO] Se registró la interacción N: ...`.
+### Important API details
 
-### Hallazgo sobre clientes y empleados
-
-- Los esquemas `ecommerce_ventas` y `rrhh` existen, pero están vacíos.
-- No hay tablas maestras `cliente` ni `empleado` en la base compartida.
-- Solo existen fixtures de otro módulo:
-  - `logistica.test_log_ventas_cliente` (IDs `1001+`).
-  - `logistica.test_log_rrhh_empleado` (IDs `301+`).
-- Esos IDs no coinciden con los datos del CRM (`1..10` / `1`), por lo que no sirven como maestros reales.
-- Consecuencia: la validación de identidad queda implementada como adaptador opcional, desactivada por flag hasta que existan las tablas maestras.
-
-### Decisiones acordadas
-
-- Demo del sprint: **API + curl/docs**, sin formularios nuevos en el frontend.
-- Reportes: implementar `/api/reportes/resumen`; RBAC queda documentado como pendiente.
-- Verificar los 10 registros existentes; no sembrar datos en Neon.
-- Incluir en el historial los eventos de interacción, creación de seguimiento y cambio de estado.
-- “Tiempo de respuesta”: usar días entre `fecha` de interacción y `fecha_programada` de seguimientos completados, porque no existe `fecha_completado`.
-- Gestor de paquetes: npm (el Dockerfile ya usa `npm ci`).
-- Comunicación entre módulos: contratos de eventos tipados + puertos/adaptadores; `@nestjs/event-emitter` solo desacopla módulos dentro del mismo proceso.
-- Para otros módulos/servicios: HTTP (webhook) o broker; en este sprint, HTTP con un receptor mock.
-- Mock ERP: solo desarrollo/demo, apagado por defecto (`ENABLE_MOCKS=false`), datos en memoria y sin tablas nuevas en Neon.
-- Entrega de eventos: best-effort con timeout/retry y log en el sprint; outbox transaccional queda como mejora si se permite una cuarta tabla.
+- `POST /api/events` accepts only:
+  - `cliente.actualizado`
+  - `pedido.creado`
+  - `reclamo.creado`
+- `seguimiento.creado` is outbound-only and must not be offered as an inbound event.
+- `GET /api/mock/empleados` exists in `api.json` but is missing from `docs/api.md`; implement it from `api.json`.
+- Mock endpoints return `404` when `ENABLE_MOCKS=false`; this is a disabled state, not a crash.
+- Backend validation errors may return `message` as a string or an array of strings.
+- `GET /api/clientes` can return `503` when the client master is unavailable.
+- `POST /api/interacciones` can return `404` for an unknown client/employee and `503` when a master is down.
+- `POST /api/seguimientos` returns `404` when the interaction does not exist.
+- Dates must be today or later in `America/Santiago`.
 
 ## Approach
 
-### 0. Saneamiento previo
+### 1. Routing and navigation
 
-- Restaurar `backend/eslint.config.mjs` para que `npm run lint` funcione.
-- Decidir el destino de `backend/src/schema/crm/` (archivos duplicados/incompletos) y de los archivos pnpm sin trackear.
-- Mantener `backend/.env` fuera de git.
+Add `react-router-dom` as the only new runtime dependency.
 
-### 1. Configuración y conexión a Neon
+Routes:
 
-- En `backend/src/config/database.config.ts`:
-  - `synchronize: false` literal.
-  - `migrationsRun: false`.
-  - SSL configurable con `DB_SSL` y `DB_SSL_REJECT_UNAUTHORIZED` (default `true`).
-  - Mantener `schema: 'crm'` y `autoLoadEntities: true`.
-- En `backend/.env.example`:
-  - agregar `DB_SSL_REJECT_UNAUTHORIZED`, `TZ=America/Santiago`;
-  - agregar flags `VALIDAR_CLIENTE`, `VALIDAR_EMPLEADO` y nombres de tablas maestras.
-- Agregar `GET /api/health/db` para verificar conectividad real a Neon.
-- No modificar el esquema de Neon.
+| Route | Page |
+|---|---|
+| `/` | Dashboard |
+| `/clientes` | Clientes |
+| `/interacciones` | Interacciones |
+| `/seguimientos` | Seguimientos |
+| `/historial` | Historial |
+| `/reportes` | Reportes |
+| `/integracion` | Integracion |
+| `/mock-erp` | Mock ERP |
 
-### 2. Entidades TypeORM y maestros
+Update:
 
-- Mantener `Interaccion`, `Seguimiento` y `Historial`.
-- Eliminar el `Cliente` actual de `crm` y reemplazarlo por un adaptador de solo lectura:
-  - `GET /api/clientes` consulta la tabla maestra si existe; si no, responde `503` con mensaje claro.
-  - `GET /api/clientes/:id` y `GET /api/clientes/rut/:rut` para validación de identidad.
-  - Sin `@ManyToOne` a maestros mientras las tablas no existan.
-- Mantener `id_cliente` e `id_empleado` como `integer`.
-- Definir puertos `ClienteMaestroPort` y `EmpleadoMaestroPort`, con dos adaptadores:
-  - `MockClienteMaestroAdapter` / `MockEmpleadoMaestroAdapter`: datos en memoria alineados con los IDs actuales (`1..10` / `1`).
-  - `HttpClienteMaestroAdapter` / `HttpEmpleadoMaestroAdapter`: llamadas a los módulos reales cuando existan.
-  - La implementación se selecciona con `MAESTROS_MODE=mock|http`.
-- Los servicios de negocio no consultan tablas maestras directamente: dependen de los puertos.
-- Documentar relaciones lógicas:
-  - `cliente 1—N interaccion_crm`
-  - `empleado 1—N interaccion_crm`
-  - `cliente 1—N historial_cliente`
-  - `interaccion_crm 1—N seguimiento_crm`
+- `App.tsx` to render the router.
+- `Header.tsx`, `Sidebar.tsx` and `ModuleCard.tsx` to use router links.
+- `data/modules.ts` to include route paths plus Reportes and Mock ERP entries.
+- Active-route styling in the sidebar and header.
 
-### 3. DTOs y validación
+The nginx config already has SPA fallback, so browser routes work in Docker.
 
-- Crear `CreateInteraccionDto`, `CreateSeguimientoDto`, `UpdateSeguimientoEstadoDto` y DTOs de filtros.
-- Reglas:
-  - IDs enteros positivos.
-  - Textos con `trim` y `@IsNotEmpty` (bloquea `""` y `"   "`).
-  - Fechas `YYYY-MM-DD`, no anteriores a hoy, comparadas en `America/Santiago`.
-  - `estado` solo en el DTO de actualización y con `@IsIn`.
-  - `estado` inicial siempre `pendiente` en el servidor.
-  - `ValidationPipe` con `whitelist`, `transform` y `forbidNonWhitelisted`.
-- Agregar filtro global para traducir errores de PostgreSQL (`CHECK`, FK, unique) a 400/409.
+### 2. API types, client and hooks
 
-### 4. Interacciones
+Create `src/api/`:
 
-- `POST /api/interacciones`:
-  - validar DTO;
-  - opcionalmente validar `idCliente` contra maestra;
-  - guardar interacción y crear historial en la misma transacción;
-  - `tipo_evento = 'contacto_comercial'`, consistente con los datos actuales;
-  - descripción con ID, canal y detalle;
-  - rollback completo si falla el historial.
-- `GET /api/interacciones` con filtros por cliente, empleado, canal y rango de fechas.
-- `GET /api/interacciones/:id` con 404 si no existe.
-- Mantener respuestas de listado como arrays para no romper el contador del frontend.
+- `types.ts`
+  - `Interaccion`
+  - `Seguimiento`
+  - `Historial`
+  - `ClienteMaestro`
+  - `EmpleadoMaestro`
+  - `CreateInteraccionDto`
+  - `CreateSeguimientoDto`
+  - `UpdateSeguimientoEstadoDto`
+  - `EstadoSeguimiento`
+  - `ListInteraccionesFilters`
+  - `ListSeguimientosFilters`
+  - `ResumenReporte`
+  - `EventEnvelope`
+  - `ClienteActualizadoPayload`
+  - `PedidoCreadoPayload`
+  - `ReclamoCreadoPayload`
+  - `MockEventsResponse`
+  - `ApiErrorBody`
+- `client.ts`
+  - Base URL from `VITE_API_URL`, default `/api`.
+  - JSON headers and parsing.
+  - Query-string builder that omits empty values.
+  - Path parameter encoding.
+  - Request timeout.
+  - `ApiError` carrying status, message and details.
+  - Normalization of `string | string[]` validation messages.
+- `endpoints.ts`
+  - One typed function per API operation.
+- `date.ts`
+  - `todayInSantiago()` using `Intl.DateTimeFormat`.
 
-### 5. Seguimientos
+Create hooks:
 
-- `POST /api/seguimientos`:
-  - verificar que la interacción exista (404 si no);
-  - validar fecha programada;
-  - forzar `estado = 'pendiente'`;
-  - registrar `seguimiento_creado` en historial;
-  - emitir `seguimiento.creado` después del commit.
-- `GET /api/seguimientos` con filtros por estado, interacción y cliente.
-- `GET /api/seguimientos/:id`.
-- `PATCH /api/seguimientos/:id/estado`:
-  - validar estado permitido;
-  - actualizar;
-  - registrar `seguimiento_actualizado` en historial;
-  - devolver el seguimiento actualizado.
-- No imponer transiciones rígidas en este sprint; documentarlas como mejora.
+- `useApiResource`: `data`, `loading`, `error`, `reload`.
+- `useApiAction`: `pending`, `error`, `run`, success callback.
 
-### 6. Historial 360 por cliente
+No state-management or data-fetching library is added.
 
-- `GET /api/historial/cliente/:idCliente`, ordenado por fecha descendente.
-- Mantener `GET /api/historial` global para el conteo del landing.
-- El historial se nutre de interacciones, creación de seguimientos y cambios de estado.
+### 3. Shared UI components
 
-### 7. Reportes
+Create `src/components/ui/`:
 
-- Crear `backend/src/modules/reportes/`.
-- `GET /api/reportes/resumen` con:
-  - seguimientos por estado;
-  - tiempo de respuesta promedio planificado;
-  - casos abiertos por `id_empleado`;
-  - interacciones por canal.
-- Documentar que el tiempo real de cierre requiere `fecha_completado` (no existe en el esquema).
+- `PageHeader`
+- `Panel`
+- `DataTable` with responsive card fallback on mobile
+- `StatusBadge`
+- `Field`
+- `AsyncState` for loading/empty/error
+- `ConfirmDialog` for destructive actions
+- `JsonEditor` for event payloads and event inspection
 
-### 8. Comunicación entre módulos, contratos y mock ERP
+Reuse the existing tokens in `src/styles/ui.ts` and `src/index.css`.
 
-#### 8.1 Diagnóstico
+### 4. Page behavior
 
-- `@nestjs/event-emitter` es in-process: desacopla módulos dentro de la misma API, pero no entrega eventos a otros contenedores/servicios.
-- `POST /api/events` es el canal inbound actual; hoy solo emite `crm.payload.received` y hace log.
-- No existe canal outbound; `seguimiento.creado` no se envía a facturación.
-- Sin broker, el transporte con otros módulos será HTTP.
+#### Dashboard `/`
 
-#### 8.2 Contrato de eventos
+Consume:
 
-Sobre común (retrocompatible: `id`, `occurredAt` y `version` pueden ser opcionales al recibir):
+- `GET /health`
+- `GET /health/db`
+- `GET /interacciones`
+- `GET /seguimientos`
+- `GET /historial`
 
-```ts
-export class EventEnvelopeDto {
-  @IsOptional()
-  @IsUUID()
-  id?: string;                // idempotencia; se genera si falta
+Show service status, database status, latency, failure reason and module counters. Link each module card to its route.
 
-  @IsString()
-  @IsNotEmpty()
-  source: string;             // "crm", "clientes", "pedidos", "postventa"
+#### Clientes `/clientes`
 
-  @IsIn(KNOWN_EVENT_TYPES)
-  type: string;               // "seguimiento.creado", ...
+Consume:
 
-  @IsOptional()
-  @IsISO8601()
-  occurredAt?: string;
+- `GET /clientes`
+- `GET /clientes/:id`
+- `GET /clientes/rut/:rut`
 
-  @IsOptional()
-  @IsString()
-  version?: string;           // "1.0"
+Show a table with ID, RUT, name and email. Support lookup by ID and by RUT. Render a clear `503` state when the master is unavailable.
 
-  @IsObject()
-  payload: Record<string, unknown>;
-}
-```
+#### Interacciones `/interacciones`
 
-DTOs de payload:
+Consume:
 
-- `SeguimientoCreadoPayloadDto`
-- `ClienteActualizadoPayloadDto`
-- `PedidoCreadoPayloadDto`
+- `GET /interacciones` with `idCliente`, `idEmpleado`, `canal`, `desde`, `hasta`
+- `GET /interacciones/:id`
+- `POST /interacciones`
 
-| Evento | Dirección | Emisor | Consumidor | Payload mínimo |
-|---|---|---|---|---|
-| `seguimiento.creado` | Outbound | CRM | Facturación | `idSeguimientoCrm`, `idInteraccion`, `idCliente`, `idEmpleado`, `fechaProgramada`, `accionRequerida`, `estado` |
-| `cliente.actualizado` | Inbound | Clientes | Inventario; CRM lo consume para historial/log | `idCliente`, `rut`, `camposActualizados`, `ocurridoEn` |
-| `pedido.creado` | Inbound | Pedidos | CRM (opcional) | `idPedido`, `idCliente`, `fecha`, `total` |
-| `reclamo.creado` | Inbound | Postventa | CRM (futuro) | `idReclamo`, `idCliente`, `fecha`, `motivo` |
+Show a filterable table and a detail panel with nested `seguimientos`. Add a create form with all backend validation limits and a default date of today in Santiago.
 
-Aclaraciones de ownership:
+#### Seguimientos `/seguimientos`
 
-- El CRM **emite** `seguimiento.creado`.
-- El CRM **consume** `cliente.actualizado` y pedidos; no los reemite a inventario. Ese flujo pertenece al módulo de clientes/pedidos.
-- `reclamo` pertenece a postventa; no se implementa en este sprint.
-- No enviar `detalle` ni datos personales a facturación; solo IDs y acción requerida.
+Consume:
 
-#### 8.3 Dispatcher inbound
+- `GET /seguimientos` with `idInteraccion`, `idCliente`, `estado`, `desde`, `hasta`
+- `GET /seguimientos/:id`
+- `POST /seguimientos`
+- `PATCH /seguimientos/:id/estado`
 
-`POST /api/events` debe:
+Show a filterable table and detail panel with the nested interaction. Add a create form and an inline status selector limited to:
 
-1. Validar el sobre con `EventEnvelopeDto`.
-2. Rechazar tipos fuera de la allowlist (`400`) y payloads inválidos (`400`).
-3. Resolver el DTO de payload según `type` (`EVENT_DTO_BY_TYPE`).
-4. Validar el payload con `plainToInstance` + `validate`.
-5. Emitir `event.type` con el payload validado.
-6. Responder `202` con `{ accepted: true, eventId }`.
+- `pendiente`
+- `en_proceso`
+- `completado`
+- `cancelado`
 
-Hoy `IntegracionService` emite siempre `crm.payload.received`; eso se mantiene como log interno, pero los handlers se suscriben al tipo real (`cliente.actualizado`, `pedido.creado`).
+Refetch the list after creation and status changes.
 
-#### 8.4 Puertos y adaptadores outbound
+#### Historial `/historial`
 
-```ts
-export interface EventPublisherPort {
-  publish(event: EventEnvelopeDto): Promise<void>;
-}
-```
+Consume:
 
-Implementaciones:
+- `GET /historial`
+- `GET /historial/cliente/:idCliente`
 
-- `NestEventPublisher`: emite dentro del proceso para listeners internos.
-- `HttpEventPublisher`: `POST` al webhook del módulo destino, con timeout y retry.
-- `MockEventPublisher`: guarda eventos en memoria para tests.
+Show the global timeline and a client filter. Display date, `tipoEvento`, description and client ID.
 
-`SeguimientosService` depende de `EventPublisherPort`, no de HTTP ni del mock. El evento se publica **después del commit** de la transacción.
+#### Reportes `/reportes`
 
-#### 8.5 Mock ERP (solo desarrollo/demo)
+Consume:
 
-`MockErpModule` apagado por defecto y protegido por `MockEnabledGuard`:
+- `GET /reportes/resumen`
 
-```env
-ENABLE_MOCKS=false
-MAESTROS_MODE=mock          # mock | http
-EVENT_DELIVERY_MODE=http    # nest | http
-FACTURACION_WEBHOOK_URL=http://localhost:3000/api/mock/facturacion/seguimientos
-INVENTARIO_WEBHOOK_URL=http://localhost:3000/api/mock/inventario/clientes
-INTEGRATION_API_KEY=        # opcional
-```
+Show:
 
-Rutas:
+- Follow-ups by state.
+- Average planned response time.
+- Completed follow-ups.
+- Open cases by employee.
+- Interactions by channel.
 
-| Método | Ruta | Simula |
-|---|---|---|
-| GET | `/api/mock/clientes` | Maestro de clientes |
-| GET | `/api/mock/clientes/:id` | Validación por ID |
-| GET | `/api/mock/clientes/rut/:rut` | Validación por RUT |
-| GET | `/api/mock/empleados/:id` | Maestro de empleados |
-| POST | `/api/mock/facturacion/seguimientos` | Receptor de `seguimiento.creado` |
-| GET | `/api/mock/facturacion/seguimientos` | Ver eventos recibidos |
-| POST | `/api/mock/inventario/clientes` | Receptor de `cliente.actualizado` |
-| GET | `/api/mock/events` | Inspeccionar eventos inbound/outbound |
+Use CSS-only bars. No chart library. Handle the case where there are no completed follow-ups.
 
-Datos del mock:
+#### Integracion `/integracion`
 
-- 10 clientes ficticios con IDs `1..10`, alineados con las interacciones existentes.
-- 1 o más empleados con ID `1`.
-- Todo en memoria; no se crean tablas en Neon.
-- Si se prefiere mayor realismo, el mock puede ser un contenedor separado (`mock-erp`) en Docker Compose; para el sprint basta el módulo interno.
+Consume:
 
-#### 8.6 Confiabilidad e idempotencia
+- `POST /events`
 
-- Entrega best-effort en el sprint: timeout + retry + log estructurado. Si falla el webhook, la operación de negocio sigue siendo válida.
-- Si se exige entrega garantizada, agregar una tabla outbox `crm.evento_saliente` en la misma transacción y un dispatcher. Implica una cuarta tabla en el esquema compartido.
-- Usar `eventId` para idempotencia; el receptor debe ignorar eventos duplicados.
-- El mock deduplica en memoria; producción requeriría inbox persistente.
-- Autenticación opcional con `INTEGRATION_API_KEY`; a futuro, HMAC/firma.
+Provide preset event composers for the three inbound types only. Validate JSON locally, send the envelope and show `202`, `eventId` and validation details. Note that inbound events can be inspected in Mock ERP only while mocks are enabled.
 
+#### Mock ERP `/mock-erp`
 
-### 9. Documentación
+Consume:
 
-- `docs/crm-schema.md`: diccionario de las tres tablas, constraints, relaciones y diagrama Mermaid.
-- `docs/api.md`: endpoints, DTOs, ejemplos curl y códigos de error.
-- `docs/events.md`: sobre de eventos, payloads versionados, ejemplos, allowlist, idempotencia y ownership.
-- `docs/demo.md`: guion de demo.
-- `docs/demo.http`: requests listos para ejecutar.
-- Actualizar `README.md` con endpoints y configuración de Neon.
-- Documentar maestros externos pendientes, mock ERP y RBAC pendiente.
+- `GET /mock/clientes`
+- `GET /mock/clientes/:id`
+- `GET /mock/clientes/rut/:rut`
+- `GET /mock/empleados`
+- `GET /mock/empleados/:id`
+- `GET /mock/facturacion/seguimientos`
+- `POST /mock/facturacion/seguimientos`
+- `DELETE /mock/facturacion/seguimientos`
+- `GET /mock/inventario/clientes`
+- `POST /mock/inventario/clientes`
+- `DELETE /mock/inventario/clientes`
+- `GET /mock/events`
+- `DELETE /mock/events`
 
-### 10. Pruebas, Docker y demo
+Use tabs:
 
-- Unit tests con fakes de `ClienteMaestroPort`, `EmpleadoMaestroPort` y `EventPublisherPort`:
-  - validaciones de campos, fechas y estados;
-  - historial automático y rollback;
-  - interacción inexistente al crear seguimiento;
-  - estado inicial `pendiente`;
-  - evento `seguimiento.creado` emitido una sola vez, después del commit.
-- Contract tests de DTOs de eventos: sobre válido, tipo desconocido, payload inválido, versión e idempotencia.
-- Integration test de la transacción interacción + historial contra Postgres local.
-- E2E con `MockErpModule`:
-  - crear interacción con `idCliente` mock;
-  - verificar historial;
-  - crear seguimiento y comprobar `GET /api/mock/facturacion/seguimientos`;
-  - enviar `cliente.actualizado` a `/api/events` y verificar el handler.
-- `scripts/smoke-test.sh` contra Neon:
-  1. health y health/db;
-  2. counts 10/10/10;
-  3. crear interacción;
-  4. verificar historial automático;
-  5. crear seguimiento;
-  6. cambiar estado a `en_proceso` y `completado`;
-  7. consultar historial por cliente;
-  8. consultar reportes;
-  9. reiniciar `crm-api`;
-  10. verificar persistencia.
-- `docker compose up --build` con Neon.
-- `docker compose --profile local-db up --build` para persistencia local (override de variables).
-- Restaurar lint y ejecutar `npm run lint`, `npm run build`, `npm test`.
-- Ensayar la demo con validaciones fallidas y flujo exitoso.
+- **Clientes:** list and ID/RUT lookup.
+- **Empleados:** list and ID lookup.
+- **Facturacion:** received `seguimiento.creado` events, manual receiver POST and confirmed clear.
+- **Inventario:** received `cliente.actualizado` events, manual receiver POST and confirmed clear.
+- **Eventos:** consolidated inbound/facturacion/inventario view and confirmed clear.
+
+Probe `GET /mock/events` on page load. A `404` renders the disabled message `ENABLE_MOCKS=true` instead of an error state.
+
+### 5. Error and form handling
+
+- `400`: map validation messages to field errors or a details banner.
+- `404`: show the missing resource and its ID, with a reload action.
+- `409`: show a duplicate/conflict message.
+- `503`: explain that the database or external master is unavailable.
+- Mock `404`: render the disabled Mock ERP state.
+- Disable submit buttons while pending.
+- Trim text inputs before submit.
+- Enforce positive integer IDs, date minimums and length limits client-side.
+- Refetch the affected list after successful mutations.
+- No optimistic updates in this iteration.
+
+## Endpoint coverage checklist
+
+### Health
+
+- [ ] `GET /health`
+- [ ] `GET /health/db`
+
+### Clientes
+
+- [ ] `GET /clientes`
+- [ ] `GET /clientes/rut/:rut`
+- [ ] `GET /clientes/:id`
+
+### Historial
+
+- [ ] `GET /historial`
+- [ ] `GET /historial/cliente/:idCliente`
+
+### Interacciones
+
+- [ ] `POST /interacciones`
+- [ ] `GET /interacciones`
+- [ ] `GET /interacciones/:id`
+
+### Seguimientos
+
+- [ ] `POST /seguimientos`
+- [ ] `GET /seguimientos`
+- [ ] `GET /seguimientos/:id`
+- [ ] `PATCH /seguimientos/:id/estado`
+
+### Reportes
+
+- [ ] `GET /reportes/resumen`
+
+### Integracion
+
+- [ ] `POST /events`
+
+### Mock ERP
+
+- [ ] `GET /mock/clientes`
+- [ ] `GET /mock/clientes/rut/:rut`
+- [ ] `GET /mock/clientes/:id`
+- [ ] `GET /mock/empleados`
+- [ ] `GET /mock/empleados/:id`
+- [ ] `POST /mock/facturacion/seguimientos`
+- [ ] `GET /mock/facturacion/seguimientos`
+- [ ] `DELETE /mock/facturacion/seguimientos`
+- [ ] `POST /mock/inventario/clientes`
+- [ ] `GET /mock/inventario/clientes`
+- [ ] `DELETE /mock/inventario/clientes`
+- [ ] `GET /mock/events`
+- [ ] `DELETE /mock/events`
+
+## Implementation order
+
+1. Add `react-router-dom`, create `router.tsx` and wire navigation.
+2. Add API types, client, endpoints, date helper and hooks.
+3. Build shared UI components.
+4. Implement Dashboard and Clientes.
+5. Implement Interacciones and Seguimientos, including mutations.
+6. Implement Historial, Reportes and Integracion.
+7. Implement Mock ERP.
+8. Audit every API operation against the checklist.
+9. Run build and manual QA.
 
 ## Files / Areas
 
-- `backend/src/config/database.config.ts`
-- `backend/src/main.ts`
-- `backend/src/app.module.ts`
-- `backend/src/common/` (decoradores, filtros, eventos)
-- `backend/src/common/contracts/events/` (sobre + payload DTOs versionados)
-- `backend/src/common/ports/` (`ClienteMaestroPort`, `EmpleadoMaestroPort`, `EventPublisherPort`)
-- `backend/src/common/adapters/` (adaptadores mock/HTTP)
-- `backend/src/modules/interacciones/`
-- `backend/src/modules/seguimientos/`
-- `backend/src/modules/historial/`
-- `backend/src/modules/clientes/` (adaptador de maestros)
-- `backend/src/modules/reportes/` (nuevo)
-- `backend/src/modules/integracion/` (dispatcher inbound, event DTOs)
-- `backend/src/modules/mock-erp/` (nuevo, dev-only, protegido por flag)
-- `backend/.env.example`
-- `backend/src/health/`
-- `database/init/01_schema.sql` (solo referencia/documentación; sin cambios en Neon)
-- `docs/crm-schema.md`
-- `docs/api.md`
-- `docs/events.md`
-- `docs/demo.md`
-- `docs/demo.http`
-- `scripts/smoke-test.sh`
-- `README.md`
-- Tests en `backend/src/**/*.spec.ts` y `backend/test/`
+- `frontend/package.json`
+- `frontend/src/main.tsx`
+- `frontend/src/App.tsx`
+- `frontend/src/router.tsx` (new)
+- `frontend/src/api/` (new)
+- `frontend/src/hooks/` (extend)
+- `frontend/src/components/ui/` (new)
+- `frontend/src/components/Header.tsx`
+- `frontend/src/components/Sidebar.tsx`
+- `frontend/src/components/ModuleCard.tsx`
+- `frontend/src/data/modules.ts`
+- `frontend/src/pages/` (new)
+- `frontend/src/styles/ui.ts`
+- `frontend/docs/api.json` (read-only checklist)
 
 ## Verification
 
-- Conexión: `GET /api/health/db` responde `up`.
-- Conteos:
-  ```sql
-  SELECT 'interaccion_crm', count(*) FROM crm.interaccion_crm
-  UNION ALL SELECT 'seguimiento_crm', count(*) FROM crm.seguimiento_crm
-  UNION ALL SELECT 'historial_cliente', count(*) FROM crm.historial_cliente;
-  ```
-  Debe mostrar 10/10/10 antes de la demo.
-- Flujo:
-  - POST interacción válida → 201.
-  - GET historial del cliente → incluye el evento automático.
-  - POST seguimiento con interacción inexistente → 404.
-  - POST seguimiento válido → 201 con `estado: "pendiente"`.
-  - PATCH estado inválido → 400.
-  - PATCH estado válido → 200.
-  - GET historial por cliente → incluye eventos de seguimiento.
-  - GET reportes → métricas coherentes.
-- Eventos:
-  - `POST /api/events` con `cliente.actualizado` válido → 202;
-  - tipo desconocido → 400;
-  - payload inválido → 400;
-  - crear seguimiento → `GET /api/mock/facturacion/seguimientos` contiene `seguimiento.creado` una sola vez;
-  - evento duplicado por `eventId` → no se procesa dos veces (si se implementa idempotencia).
-- Validaciones:
-  - falta `fecha`, `canal` o `detalle` → 400;
-  - texto vacío o solo espacios → 400;
-  - fecha anterior a hoy → 400;
-  - estado fuera del enum → 400.
-- Persistencia:
-  - `docker compose restart api` y volver a consultar.
-  - `docker compose down` + `up -d` (sin `-v`) y volver a consultar.
-- Build:
-  - `npm run lint`
-  - `npm run build`
-  - `npm test`
+- `cd frontend && npm run build` passes with strict TypeScript.
+- Every operation in the endpoint coverage checklist is reachable from the UI.
+- Creating an interaction appears in the interaction list and in history.
+- Creating a follow-up with an unknown interaction shows `404`.
+- A valid follow-up appears as `pendiente`.
+- Changing a follow-up status updates the row and adds a history entry.
+- Filters generate correct query strings and omit empty values.
+- RUT lookup works with and without dots/dashes.
+- Report totals match the visible data.
+- `/events` rejects unknown types and invalid payloads with readable details.
+- Mock ERP renders the disabled state with `ENABLE_MOCKS=false` and the full console with `ENABLE_MOCKS=true`.
+- DELETE actions require confirmation.
+- Run write-flow QA against local PostgreSQL rather than Neon unless demo records are explicitly wanted.
 
 ## Open Questions
 
-- ¿Cuándo y quién creará `ecommerce_ventas.cliente` y `rrhh.empleado`? Sin ellas, `VALIDAR_CLIENTE` queda en `false`.
-- ¿El equipo de autenticación entregará JWT/roles para proteger el historial 360? Por ahora RBAC queda documentado.
-- ¿Se quiere agregar `fecha_completado` a `seguimiento_crm` para medir tiempo de respuesta real? Implica cambio de esquema compartido.
-- ¿Se eliminan los archivos pnpm sin trackear o se migra el proyecto a pnpm?
-- ¿Se conserva `backend/src/schema/crm/` como borrador o se elimina al consolidar las entidades?
-- ¿La demo se ejecutará contra Neon (datos reales) o contra el Postgres local?
-- ¿El mock ERP va dentro del mismo backend (`/api/mock`) o como contenedor separado `mock-erp`?
-- ¿Se permite agregar `crm.evento_saliente` (outbox) al esquema compartido para entrega garantizada?
-- ¿Qué API key/HMAC usarán los otros módulos para `POST /api/events`?
-- ¿Quién emite `cliente.actualizado`, con qué payload y versión exacta?
-- ¿`pedido.creado` debe crear una interacción automática o solo registrarse en historial?
-- ¿Se publicará un contrato compartido (OpenAPI/AsyncAPI) para que los otros grupos generen clientes?
+- Should future iterations add backend `@ApiProperty` annotations and regenerate `docs/api.json` so the client can be generated?
+- Should automated frontend tests be added in a later task? No test framework is currently configured.
+- Should the client master be used to enrich interaction/follow-up rows with client names, or is showing IDs sufficient for this iteration?
