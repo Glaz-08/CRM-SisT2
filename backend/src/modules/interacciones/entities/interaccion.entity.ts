@@ -1,6 +1,10 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Seguimiento } from '../../seguimientos/entities/seguimiento.entity';
 
+/**
+ * Interacción comercial almacenada en `crm.interaccion_crm`.
+ * Las claves de cliente/empleado son lógicas: apuntan a maestros externos.
+ */
 @Entity({ name: 'interaccion_crm' })
 export class Interaccion {
   @PrimaryGeneratedColumn('identity', { name: 'id_interaccion' })

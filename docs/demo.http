@@ -1,0 +1,92 @@
+@baseUrl = http://localhost:3000/api
+@fecha = 2026-10-26
+@fechaProgramada = 2026-10-27
+@idCliente = 1
+@idEmpleado = 1
+
+### Health
+GET {{baseUrl}}/health
+
+### Health DB
+GET {{baseUrl}}/health/db
+
+### Clientes reales (master.cliente)
+GET {{baseUrl}}/clientes
+
+### Cliente por ID
+GET {{baseUrl}}/clientes/{{idCliente}}
+
+### Cliente por RUT sin puntos
+GET {{baseUrl}}/clientes/rut/111111111
+
+### Empleado mock
+GET {{baseUrl}}/mock/empleados/{{idEmpleado}}
+
+### Crear interacción
+POST {{baseUrl}}/interacciones
+Content-Type: application/json
+
+{
+  "idCliente": {{idCliente}},
+  "idEmpleado": {{idEmpleado}},
+  "fecha": "{{fecha}}",
+  "canal": "whatsapp",
+  "detalle": "Consulta por despacho"
+}
+
+### Listar interacciones del cliente
+GET {{baseUrl}}/interacciones?idCliente={{idCliente}}
+
+### Crear seguimiento
+POST {{baseUrl}}/seguimientos
+Content-Type: application/json
+
+{
+  "idInteraccion": 12,
+  "fechaProgramada": "{{fechaProgramada}}",
+  "accionRequerida": "Llamar al cliente"
+}
+
+### Cambiar seguimiento a en proceso
+PATCH {{baseUrl}}/seguimientos/12/estado
+Content-Type: application/json
+
+{
+  "estado": "en_proceso"
+}
+
+### Cambiar seguimiento a completado
+PATCH {{baseUrl}}/seguimientos/12/estado
+Content-Type: application/json
+
+{
+  "estado": "completado"
+}
+
+### Historial del cliente
+GET {{baseUrl}}/historial/cliente/{{idCliente}}
+
+### Reportes
+GET {{baseUrl}}/reportes/resumen
+
+### Evento inbound cliente.actualizado
+POST {{baseUrl}}/events
+Content-Type: application/json
+
+{
+  "source": "postventa",
+  "type": "cliente.actualizado",
+  "payload": {
+    "idCliente": {{idCliente}},
+    "rut": "11.111.111-1",
+    "camposActualizados": {
+      "email": "nuevo@demo.cl"
+    }
+  }
+}
+
+### Mock facturación
+GET {{baseUrl}}/mock/facturacion/seguimientos
+
+### Mock events
+GET {{baseUrl}}/mock/events

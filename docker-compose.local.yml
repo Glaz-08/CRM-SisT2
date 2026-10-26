@@ -1,0 +1,16 @@
+services:
+  api:
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-crm_lego}
+      DB_USER: ${POSTGRES_USER:-crm}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-crm}
+      DB_SSL: "false"
+      DB_SCHEMA: crm
+      CLIENTE_MAESTRO_MODE: mock
+      EMPLEADO_MAESTRO_MODE: mock
+      ENABLE_MOCKS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
