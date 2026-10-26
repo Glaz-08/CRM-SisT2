@@ -64,6 +64,23 @@ Ese override usa `CLIENTE_MAESTRO_MODE=mock` y `EMPLEADO_MAESTRO_MODE=mock` para
 1. En `backend/`: `npm run start:dev`
 2. En `frontend/`: `npm run dev` → http://localhost:5173
 
+### Rutas del frontend
+
+Todas las pantallas comparten el mismo layout (`Header` + `Sidebar`) y consumen la API tipada de `frontend/src/api/`:
+
+| Ruta | Pantalla |
+| --- | --- |
+| `/` | Estado de la API y acceso a los módulos |
+| `/clientes` | Maestro de clientes por ID o RUT |
+| `/interacciones` | Filtros, detalle con seguimientos y creación |
+| `/seguimientos` | Filtros, detalle, creación y cambio de estado |
+| `/historial` | Historial global o por cliente |
+| `/reportes` | Métricas del CRM |
+| `/integracion` | Envío de eventos inbound (`POST /api/events`) |
+| `/mock-erp` | Maestros y receptores mock (requiere `ENABLE_MOCKS=true`) |
+
+Los tipos se mantienen a mano desde las entidades/DTO del backend; `frontend/docs/api.json` es solo el inventario de operaciones y no genera código.
+
 ## Contratos iniciales
 
 | Método | Ruta | Uso |
