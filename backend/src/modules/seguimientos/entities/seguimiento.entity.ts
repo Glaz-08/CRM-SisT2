@@ -6,16 +6,9 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Interaccion } from '../../interacciones/entities/interaccion.entity';
+import type { EstadoSeguimiento } from '../seguimiento.constants';
 
-export const ESTADOS_SEGUIMIENTO = [
-  'pendiente',
-  'en_proceso',
-  'completado',
-  'cancelado',
-] as const;
-
-export type EstadoSeguimiento = (typeof ESTADOS_SEGUIMIENTO)[number];
-
+/** Seguimiento asociado a una interacción en `crm.seguimiento_crm`. */
 @Entity({ name: 'seguimiento_crm' })
 export class Seguimiento {
   @PrimaryGeneratedColumn('identity', { name: 'id_seguimiento_crm' })
